@@ -1,0 +1,27 @@
+[package]
+name = "maybe-multiple"
+description = "An extension of `Option` which can hold none, one or multiple elements"
+readme = "README.md"
+
+version = "0.1.0"
+edition = "2021"
+
+license = "Apache-2.0"
+repository = "https://github.com/bmc-labs/maybe-multiple"
+keywords = ["container", "multiple", "option"]
+exclude = [".github"]
+
+authors = ["Florian Eich <florian.eich@bmc-labs.com>"]
+
+[dependencies]
+serde = { version = "1.0.204", optional = true }
+thiserror = "1.0.63"
+
+[features]
+default = []
+serde = ["dep:serde"]
+
+[dev-dependencies]
+pretty_assertions = "1.4.0"
+proptest = "1.5.0"
+test-strategy = "0.4.0"
