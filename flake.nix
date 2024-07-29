@@ -50,7 +50,7 @@
             rust-bin.nightly.latest.rustfmt
           ];
 
-          cargoTestExtraArgs = "--workspace";
+          cargoExtraArgs = "--all-features";
         };
 
         cargoArtifacts = craneLib.buildDepsOnly commonArgs;
