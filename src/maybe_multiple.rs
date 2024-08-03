@@ -10,7 +10,7 @@ use crate::Multiple;
 )]
 pub enum MaybeMultiple<T> {
     None,
-    Some(T),
+    Single(T),
     Multiple(Multiple<T>),
 }
 
@@ -27,8 +27,8 @@ impl<T> MaybeMultiple<T> {
 
     #[must_use = "to assert that this has a value, wrap this in an `assert!()` instead"]
     #[inline]
-    pub fn is_some(&self) -> bool {
-        matches!(self, Self::Some(_))
+    pub fn is_single(&self) -> bool {
+        matches!(self, Self::Single(_))
     }
 
     #[must_use = "to assert that this has a value, wrap this in an `assert!()` instead"]
@@ -40,7 +40,7 @@ impl<T> MaybeMultiple<T> {
     /// Collapses a [`Vec`] into a [`MaybeMultiple`].
     ///
     /// This function collapses an empty [`Vec`] into [`MaybeMultiple::None`], a single element
-    /// [`Vec`] into [`MaybeMultiple::Some`], and a multiple element [`Vec`] into
+    /// [`Vec`] into [`MaybeMultiple::Single`], and a multiple element [`Vec`] into
     /// [`MaybeMultiple::Multiple`]. The [`Vec`] is consumed.
     ///
     /// This function is provided in lue of `impl From<Vec<T>> for MaybeMultiple<T>`, which would
@@ -58,7 +58,7 @@ impl<T> MaybeMultiple<T> {
     /// assert!(maybe_multiple.is_none());
     ///
     /// let maybe_multiple = MaybeMultiple::collapse_vec_into(vec![42]);
-    /// assert!(maybe_multiple.is_some());
+    /// assert!(maybe_multiple.is_single());
     ///
     /// let maybe_multiple = MaybeMultiple::collapse_vec_into(vec![42, 43, 44]);
     /// assert!(maybe_multiple.is_multiple());
@@ -67,7 +67,7 @@ impl<T> MaybeMultiple<T> {
     pub fn collapse_vec_into(mut v: Vec<T>) -> Self {
         match v.len() {
             0 => Self::None,
-            1 => Self::Some(v.pop().expect("input vec has one element")),
+            1 => Self::Single(v.pop().expect("input vec has one element")),
             _ => Self::Multiple(v.try_into().expect("input vec has more than one element")),
         }
     }
@@ -77,7 +77,7 @@ impl<T> MaybeMultiple<T> {
     pub fn expand_into_vec(self) -> Vec<T> {
         match self {
             Self::None => vec![],
-            Self::Some(v) => vec![v],
+            Self::Single(v) => vec![v],
             Self::Multiple(m) => m.into(),
         }
     }
@@ -95,7 +95,7 @@ impl<T> Default for MaybeMultiple<T> {
 
 impl<T> From<T> for MaybeMultiple<T> {
     fn from(t: T) -> Self {
-        Self::Some(t)
+        Self::Single(t)
     }
 }
 
@@ -124,9 +124,9 @@ mod tests {
                 let e = v[0];
                 assert_eq!(
                     MaybeMultiple::collapse_vec_into(v.clone()),
-                    MaybeMultiple::Some(e)
+                    MaybeMultiple::Single(e)
                 );
-                assert_eq!(MaybeMultiple::Some(e).expand_into_vec(), v);
+                assert_eq!(MaybeMultiple::Single(e).expand_into_vec(), v);
             }
             _ => {
                 assert_eq!(
@@ -154,8 +154,8 @@ mod tests {
     }
 
     #[proptest]
-    fn serialize_deserialize_some(val: u8) {
-        let maybe_multiple = MaybeMultiple::Some(val);
+    fn serialize_deserialize_single(val: u8) {
+        let maybe_multiple = MaybeMultiple::Single(val);
         assert_eq!(
             serde_json::to_string(&maybe_multiple).unwrap(),
             serde_json::to_string(&val).unwrap()
