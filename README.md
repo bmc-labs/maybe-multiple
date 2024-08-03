@@ -2,8 +2,8 @@
 
 # `🎰 maybe-multiple`
 
-![build](https://github.com/bmc-labs/maybe-multiple/actions/workflows/build.yaml/badge.svg?branch=main)
-![docs badge](https://img.shields.io/badge/docs-latest-blue?link=https%3A%2F%2Fdocs.rs%2Fmaybe-multiple%2Flatest%2Fmaybe_multiple%2F)
+[![build](https://github.com/bmc-labs/maybe-multiple/actions/workflows/build.yaml/badge.svg?branch=main)](https://github.com/bmc-labs/maybe-multiple/actions)
+[![docs](https://img.shields.io/badge/docs-latest-blue)](https://docs.rs/maybe-multiple/latest/maybe_multiple)
 
 **An extension of `Option` which can hold none, one or multiple elements**
 
