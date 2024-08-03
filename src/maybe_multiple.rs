@@ -10,7 +10,7 @@ use crate::Multiple;
 )]
 pub enum MaybeMultiple<T> {
     None,
-    Some(T),
+    Single(T),
     Multiple(Multiple<T>),
 }
 
@@ -27,8 +27,8 @@ impl<T> MaybeMultiple<T> {
 
     #[must_use = "to assert that this has a value, wrap this in an `assert!()` instead"]
     #[inline]
-    pub fn is_some(&self) -> bool {
-        matches!(self, Self::Some(_))
+    pub fn is_single(&self) -> bool {
+        matches!(self, Self::Single(_))
     }
 
     #[must_use = "to assert that this has a value, wrap this in an `assert!()` instead"]
@@ -37,9 +37,49 @@ impl<T> MaybeMultiple<T> {
         matches!(self, Self::Multiple(_))
     }
 
+    /// Collapses a [`Vec`] into a [`MaybeMultiple`].
+    ///
+    /// This function collapses an empty [`Vec`] into [`MaybeMultiple::None`], a single element
+    /// [`Vec`] into [`MaybeMultiple::Single`], and a multiple element [`Vec`] into
+    /// [`MaybeMultiple::Multiple`]. The [`Vec`] is consumed.
+    ///
+    /// This function is provided in lue of `impl From<Vec<T>> for MaybeMultiple<T>`, which would
+    /// arguably be more convenient, but wouldn't make the conversion as explicit as this function
+    /// does. The reason why [`MaybeMultiple`] exists is to make this very specific use case very
+    /// explicit, so hiding the conversion behind an `.into()` call is not desirable.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use crate::maybe_multiple::MaybeMultiple;
+    /// #
+    /// let vec: Vec<u8> = vec![];
+    /// let maybe_multiple = MaybeMultiple::collapse_vec_into(vec);
+    /// assert!(maybe_multiple.is_none());
+    ///
+    /// let maybe_multiple = MaybeMultiple::collapse_vec_into(vec![42]);
+    /// assert!(maybe_multiple.is_single());
+    ///
+    /// let maybe_multiple = MaybeMultiple::collapse_vec_into(vec![42, 43, 44]);
+    /// assert!(maybe_multiple.is_multiple());
+    /// ```
     #[inline]
-    pub fn from_vec(v: Vec<T>) -> Self {
-        Self::from(v)
+    pub fn collapse_vec_into(mut v: Vec<T>) -> Self {
+        match v.len() {
+            0 => Self::None,
+            1 => Self::Single(v.pop().expect("input vec has one element")),
+            _ => Self::Multiple(v.try_into().expect("input vec has more than one element")),
+        }
+    }
+
+    /// Inverse of [`MaybeMultiple::collapse_vec_into`]. See docs of that function for more info.
+    #[inline]
+    pub fn expand_into_vec(self) -> Vec<T> {
+        match self {
+            Self::None => vec![],
+            Self::Single(v) => vec![v],
+            Self::Multiple(m) => m.into(),
+        }
     }
 }
 
@@ -55,27 +95,7 @@ impl<T> Default for MaybeMultiple<T> {
 
 impl<T> From<T> for MaybeMultiple<T> {
     fn from(t: T) -> Self {
-        Self::Some(t)
-    }
-}
-
-impl<T> From<Vec<T>> for MaybeMultiple<T> {
-    fn from(mut v: Vec<T>) -> Self {
-        match v.len() {
-            0 => Self::None,
-            1 => Self::Some(v.pop().expect("input vec has one element")),
-            _ => Self::Multiple(v.try_into().expect("input vec has more than one element")),
-        }
-    }
-}
-
-impl<T> From<MaybeMultiple<T>> for Vec<T> {
-    fn from(maybe_multiple: MaybeMultiple<T>) -> Self {
-        match maybe_multiple {
-            MaybeMultiple::None => vec![],
-            MaybeMultiple::Some(v) => vec![v],
-            MaybeMultiple::Multiple(m) => m.into(),
-        }
+        Self::Single(t)
     }
 }
 
@@ -93,15 +113,31 @@ mod tests {
     #[proptest]
     fn proptest_conversions(v: Vec<u8>) {
         match v.len() {
-            0 => assert_eq!(MaybeMultiple::from_vec(v), MaybeMultiple::None),
+            0 => {
+                assert_eq!(
+                    MaybeMultiple::collapse_vec_into(v.clone()),
+                    MaybeMultiple::None
+                );
+                assert_eq!(MaybeMultiple::<u8>::None.expand_into_vec(), v);
+            }
             1 => {
                 let e = v[0];
-                assert_eq!(MaybeMultiple::from(v), MaybeMultiple::Some(e));
+                assert_eq!(
+                    MaybeMultiple::collapse_vec_into(v.clone()),
+                    MaybeMultiple::Single(e)
+                );
+                assert_eq!(MaybeMultiple::Single(e).expand_into_vec(), v);
             }
-            _ => assert_eq!(
-                MaybeMultiple::from(v.clone()),
-                MaybeMultiple::Multiple(v.try_into().unwrap())
-            ),
+            _ => {
+                assert_eq!(
+                    MaybeMultiple::collapse_vec_into(v.clone()),
+                    MaybeMultiple::Multiple(v.clone().try_into().unwrap())
+                );
+                assert_eq!(
+                    MaybeMultiple::Multiple(v.clone().try_into().unwrap()).expand_into_vec(),
+                    v
+                );
+            }
         }
     }
 
@@ -118,8 +154,8 @@ mod tests {
     }
 
     #[proptest]
-    fn serialize_deserialize_some(val: u8) {
-        let maybe_multiple = MaybeMultiple::Some(val);
+    fn serialize_deserialize_single(val: u8) {
+        let maybe_multiple = MaybeMultiple::Single(val);
         assert_eq!(
             serde_json::to_string(&maybe_multiple).unwrap(),
             serde_json::to_string(&val).unwrap()
@@ -134,7 +170,7 @@ mod tests {
 
     #[proptest]
     fn serialize_deserialize_multiple(#[any(size_range(2..128).lift())] vec: Vec<u8>) {
-        let maybe_multiple = MaybeMultiple::from_vec(vec.clone());
+        let maybe_multiple = MaybeMultiple::collapse_vec_into(vec.clone());
         assert_eq!(
             serde_json::to_string(&maybe_multiple).unwrap(),
             serde_json::to_string(&vec).unwrap()
